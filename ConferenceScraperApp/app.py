@@ -5,7 +5,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from nltk import sent_tokenize, word_tokenize
-#import simplemma
+import simplemma
 
 def usage():
     print("python -l <LANGUAGE> -y <YEAR> -m <MONTH>")
@@ -92,7 +92,9 @@ def run(argv):
     #TODO Make sure that the class is going to be the same no matter what or find a different way to distinguish
     talks = base_soup.findAll("a", class_="listTile-WHLxI")
 
-    #langdata = simplemma.load_data("bg")
+    langdata = simplemma.load_data(lang)
+    word_list = {}
+    lemma_list = {}
 
     #iterate over each talk URL
     for talk_link in talks:
@@ -125,9 +127,24 @@ def run(argv):
                         if sentence:
                             words = word_tokenize(sentence)
                             for word in words:
-                                #lemma = simplemma.lemmatize(word, langdata)
-                                lemma = ""
-                                print("%s -> %s" % (word, lemma))
+                                if len(word) == 1 and re.search("\W", word):
+                                    continue
+                                lemma = simplemma.lemmatize(word, langdata)
+                                if verbose:
+                                    print("%s -> %s" % (word, lemma))
+
+                                if word not in word_list:
+                                    word_list[word] = 0
+                                word_list[word] += 1
+
+                                if lemma not in lemma_list:
+                                    lemma_list[lemma] = 0
+                                lemma_list[lemma] += 1
         else:
             if verbose:
                 print("SKIPPING: %s" %talk_url)
+    word_list = {k:v for k,v in sorted(word_list.items(), key=lambda item: item[1], reverse=True)}
+    print(word_list)
+
+    lemma_list = {k:v for k,v in sorted(lemma_list.items(), key=lambda item: item[1], reverse=True)}
+    print(lemma_list)
