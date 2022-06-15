@@ -1,11 +1,12 @@
 import sys
 import getopt
 from datetime import date
+import re
 import requests
 from bs4 import BeautifulSoup
-import re
 from nltk import sent_tokenize, word_tokenize
 import simplemma
+from progress.bar import Bar
 
 def usage():
     print("python -l <LANGUAGE> -y <YEAR> -m <MONTH>")
@@ -96,6 +97,8 @@ def run(argv):
     word_list = {}
     lemma_list = {}
 
+    num_talks = len(talks)
+    bar = Bar("Processing", max=num_talks)
     #iterate over each talk URL
     for talk_link in talks:
         talk_url = talk_link["href"]
@@ -143,6 +146,7 @@ def run(argv):
         else:
             if verbose:
                 print("SKIPPING: %s" %talk_url)
+        bar.next()
     word_list = {k:v for k,v in sorted(word_list.items(), key=lambda item: item[1], reverse=True)}
     print(word_list)
 
