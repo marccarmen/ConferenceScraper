@@ -9,3 +9,11 @@ The uses several libraries. Please use the commands below to install the necessa
 <code>pip install nltk</code><br>
 <code>pip install simplemma</code><br>
 <code>pip install requests</code><br>
+
+# NLTK Requirements
+After you have installed NLTK you will need to install the following resources:
+<br>
+<code>
+import nltk
+nltk.download('punkt')
+</code>
