@@ -35,6 +35,11 @@ The default parameters would make the command look like the following
 command:<br>
 <code>python ConferenceScraperApp/_main_.py -l eng -m 04,10 -y <CURRENT_YEAR></code>
 
+## Optional Parameters
+
+<li><code>--includeLemma</code> By default the lemma is not included. 
+If this parameter is included then the list of lemmas will be included in the output</li>
+
 # Output
 The output of this script is a tab separated list that looks like this<br>
 
@@ -47,7 +52,8 @@ The output of this script is a tab separated list that looks like this<br>
 | in   | 959	     |     | to    | 1754        |
 | a    | 738	     |     | we	   | 1196        |
 <br>
-The Word/Word Count and Lemma/Lemma Count are not related. I output them this
+Lemma/Lemma Count are only included if the <code>--includeLemma</code> parameter
+is set. The Word/Word Count and Lemma/Lemma Count are not related. I output them this
 way so that all the data can be easily imported into a spreadsheet and 
 manipulated as needed. Instructions for importing a txt file into Microsoft 
 Excel are available https://support.microsoft.com/en-us/office/import-or-export-text-txt-or-csv-files-5250ac4c-663c-47ce-937b-339e391393ba 

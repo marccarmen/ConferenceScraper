@@ -102,11 +102,12 @@ def run(argv):
     # by default output prints to the console
     output = None
 
+    show_lemma = False
     verbose = False
 
     # process the input from the command line
     try:
-        opts, args = getopt.getopt(argv, "l:y:m:o:hv", ["language=", "year=", "month=", "output="])
+        opts, args = getopt.getopt(argv, "l:y:m:o:hv", ["language=", "year=", "month=", "output=", "verbose", "includeLemma"])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -123,10 +124,12 @@ def run(argv):
             year = arg.replace(" ", "")
         elif opt in ("-m", "--month"):
             month = arg.replace(" ", "")
-        elif opt == "-v":
+        elif opt == ("-v", "--verbose"):
             verbose = True
         elif opt in ("-o", "--output"):
             output = arg
+        elif opt == "--includeLemma":
+            show_lemma = True
         else:
             assert False, "unhandled option"
 
@@ -247,7 +250,7 @@ def run(argv):
                                     if len(word) == 1 and re.search(r"\W", word):
                                         continue
                                     lemma = None
-                                    if language_data is not None and len(language_data) > 0:
+                                    if show_lemma and language_data is not None and len(language_data) > 0:
                                         lemma = simplemma.lemmatize(word, language_data)
                                     if verbose:
                                         print("%s -> %s" % (word, lemma))
@@ -265,7 +268,7 @@ def run(argv):
         if word_list is not None:
             word_list = {k: v for k, v in sorted(word_list.items(), key=lambda item: item[1], reverse=True)}
 
-        if lemma_list is not None:
+        if show_lemma and lemma_list is not None:
             lemma_list = {k: v for k, v in sorted(lemma_list.items(), key=lambda item: item[1], reverse=True)}
 
         print_count = 0
@@ -273,7 +276,10 @@ def run(argv):
         lemma_keys = list(lemma_list.keys())
         max_count = max(len(word_keys), len(lemma_keys))
         f = None
-        header = "WORD\tWORD COUNT\t\tLEMMA\tLEMMA COUNT\n"
+        header = "WORD\tWORD COUNT"
+        if show_lemma:
+            header = "%s%s" % (header, "\t\tLEMMA\tLEMMA COUNT")
+        header = "%s%s" % (header, "\n")
         if output is not None:
             f = open(output, mode="w", encoding="utf-8")
             f.write(header)
