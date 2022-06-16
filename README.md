@@ -110,3 +110,14 @@ resources:
 <br>
 <code>import nltk</code><br>
 <code>nltk.download('punkt')</code>
+
+# Issues
+
+- [ ] Compatible with talks 2019 and on. System is filtering out older talks
+  due to the filename format<br>
+- [ ] Year and Month parameters support a variety of formats. It needs more
+  error checking to prevent issues. Specifically spaces should be stripped
+
+# Potential Features
+- [ ] More linguistic processing. Part of speech
+- [ ] Executable version so anyone can use it
