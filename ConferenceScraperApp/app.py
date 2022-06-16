@@ -14,23 +14,87 @@ def usage():
 
 
 def run(argv):
+    """
+    # Languages that don't support tokenization and lemmatization
+        "zho": {
+            "iso_name": "Chinese (Mandarin)",
+            "iso_one": "zh"
+        },
+        "jpn": {
+            "iso_name": "Japanese",
+            "iso_one": "ja"
+        },
+    # Languages with no translation available
+        "bik": {
+            "iso_name": "Bikol",
+            "iso_one": ""
+        },
+    """
     # ISO 639 information
     available_languages = {
-        "en": {
-            "iso_name": "English",
-            "iso_three": "eng"
-        },
-        "es": {
-            "iso_name": "Spanish",
-            "iso_three": "spa"
-        },
-        "bg": {
+        "bul": {
             "iso_name": "Bulgarian",
-            "iso_three": "bul"
+            "iso_one": "bg"
+        },
+        "ceb": {
+            "iso_name": "Cebuano",
+            "iso_one": ""
+        },
+        "deu": {
+            "iso_name": "German",
+            "iso_one": "de"
+        },
+        "eng": {
+            "iso_name": "English",
+            "iso_one": "en"
+        },
+        "spa": {
+            "iso_name": "Spanish",
+            "iso_one": "es"
+        },
+        "fra": {
+            "iso_name": "French",
+            "iso_one": "fr"
+        },
+        "hil": {
+               "iso_name": "Hiligaynon",
+               "iso_one": ""
+        },
+        "ilo": {
+            "iso_name": "Ilokano",
+            "iso_one": ""
+        },
+        "kor": {
+            "iso_name": "Korean",
+            "iso_one": "ko"
+        },
+        "ita": {
+            "iso_name": "Italian",
+            "iso_one": "it"
+        },
+        "por": {
+            "iso_name": "Portuguese",
+            "iso_one": "pt"
+        },
+        "rus": {
+            "iso_name": "Russian",
+            "iso_one": "ru"
+        },
+        "smo": {
+            "iso_name": "Samoan",
+            "iso_one": "sm"
+        },
+        "tgl": {
+            "iso_name": "Tagalog",
+            "iso_one": "tl"
+        },
+        "ton": {
+            "iso_name": "Tongan",
+            "iso_one": "to"
         }
     }
-    # eng/spa/bul
-    lang = "en"
+    # ISO 639-2 Code
+    lang = "eng"
     # four digit year, two four digit years separated by -, list of four digit year separated by comma
     year = str(date.today().year)
     # should be 04, 10, or 04,10
@@ -61,7 +125,7 @@ def run(argv):
             month = arg
         elif opt == "-v":
             verbose = True
-        elif opt in ("-o", "output"):
+        elif opt in ("-o", "--output"):
             output = arg
         else:
             assert False, "unhandled option"
@@ -117,9 +181,9 @@ def run(argv):
     lemma_list = {}
 
     # Get the url setup
-    lang_url = available_languages[lang]["iso_three"]
+    lang_url = lang
     site_url = "https://www.churchofjesuschrist.org"
-    language_data = simplemma.load_data(lang)
+    language_data = simplemma.load_data(available_languages[lang]["iso_one"])
 
     # iterate over one or more years
     for year in years:
@@ -185,7 +249,9 @@ def run(argv):
                                     for word in words:
                                         if len(word) == 1 and re.search(r"\W", word):
                                             continue
-                                        lemma = simplemma.lemmatize(word, language_data)
+                                        lemma = None
+                                        if language_data is not None and len(language_data) > 0:
+                                            lemma = simplemma.lemmatize(word, language_data)
                                         if verbose:
                                             print("%s -> %s" % (word, lemma))
 
@@ -193,9 +259,10 @@ def run(argv):
                                             word_list[word] = 0
                                         word_list[word] += 1
 
-                                        if lemma not in lemma_list:
-                                            lemma_list[lemma] = 0
-                                        lemma_list[lemma] += 1
+                                        if lemma is not None:
+                                            if lemma not in lemma_list:
+                                                lemma_list[lemma] = 0
+                                            lemma_list[lemma] += 1
                 else:
                     if verbose:
                         print("SKIPPING: %s" % talk_url)
@@ -223,9 +290,9 @@ def run(argv):
             word_count = word_list[word] if word != "" else ""
             lemma = lemma_keys[print_count] if print_count < len(lemma_keys) else ""
             lemma_count = lemma_list[lemma] if lemma != "" else ""
-            line = "%s\t%s\t\t%s\t%s\n" % (word, word_count, lemma, lemma_count)
+            line = "%s\t%s\t\t%s\t%s" % (word, word_count, lemma, lemma_count)
             if f is not None and output is not None:
-                f.write(line)
+                f.write("%s%s" % (line, "\n"))
             else:
                 print(line)
             print_count += 1
