@@ -57,8 +57,8 @@ def run(argv):
             "iso_one": "fr"
         },
         "hil": {
-               "iso_name": "Hiligaynon",
-               "iso_one": ""
+            "iso_name": "Hiligaynon",
+            "iso_one": ""
         },
         "ilo": {
             "iso_name": "Ilokano",
@@ -120,9 +120,9 @@ def run(argv):
             if lang not in available_languages.keys():
                 assert False, "Language unavailable. Please choose from %s" % available_languages.keys()
         elif opt in ("-y", "--year"):
-            year = arg
+            year = arg.replace(" ", "")
         elif opt in ("-m", "--month"):
-            month = arg
+            month = arg.replace(" ", "")
         elif opt == "-v":
             verbose = True
         elif opt in ("-o", "--output"):
@@ -200,9 +200,8 @@ def run(argv):
             # load the page HTML into beautiful soup
             base_soup = BeautifulSoup(base_page.content, "html.parser")
 
-            # get a list of all of the talks
-            # TODO class could change...update code to use different selector
-            talks = base_soup.findAll("a", class_="listTile-WHLxI")
+            # get a list of all the talks
+            talks = base_soup.findAll("a", {"class": lambda l: l and l.startswith('listTile')})
 
             # these variables are only used for providing progress update
             talk_count = 0
@@ -214,58 +213,53 @@ def run(argv):
                 print("Processing talk %d of %d" % (talk_count, talk_total))
                 talk_url = talk_link["href"]
                 # the name of the URL always ends with digits and then the last name of the speaker
-                if re.search(r"/study/general-conference/\d\d\d\d/\d\d/\d+.*", talk_url):
-                    talk_url = "%s?lang=%s" % (talk_url, lang_url)
-                    if verbose:
-                        print("PROCESSING: %s " % talk_url)
-                    # load the talk page and convert to a BeautifulSoup object
-                    talk_page = requests.get("%s%s" % (site_url, talk_url))
-                    talk_soup = BeautifulSoup(talk_page.content, "html.parser")
-                    # Get the talk metadata
-                    title = talk_soup.find("title").text
-                    speaker = \
-                        talk_soup.find("p", class_="author-name").text if talk_soup.find("p", class_="author-name") \
-                        else ""
-                    role = \
-                        talk_soup.find("p", class_="author-role").text if talk_soup.find("p", class_="author-role") \
-                        else ""
-                    summary = talk_soup.find("p", class_="kicker").text if talk_soup.find("p", class_="kicker") \
-                        else ""
-                    if verbose:
-                        print("%s\n%s\n%s\n%s" % (title, speaker, role, summary))
 
-                    talk_paragraphs = talk_soup.findAll("p", id=re.compile(".*"))
-                    # iterate over all the paragraphs looking for p# or title# which are the text of the talk
-                    for talk_para in talk_paragraphs:
-                        if "id" in talk_para.attrs and \
-                                (re.search(r"^p\d+$", talk_para["id"]) or re.search(r"^title\d+$", talk_para["id"])):
-                            paragraph = talk_para.text
-                            if verbose:
-                                print(paragraph)
-                            sentences = sent_tokenize(paragraph)
-                            for sentence in sentences:
-                                if sentence:
-                                    words = word_tokenize(sentence)
-                                    for word in words:
-                                        if len(word) == 1 and re.search(r"\W", word):
-                                            continue
-                                        lemma = None
-                                        if language_data is not None and len(language_data) > 0:
-                                            lemma = simplemma.lemmatize(word, language_data)
-                                        if verbose:
-                                            print("%s -> %s" % (word, lemma))
+                talk_url = "%s?lang=%s" % (talk_url, lang_url)
+                if verbose:
+                    print("PROCESSING: %s " % talk_url)
+                # load the talk page and convert to a BeautifulSoup object
+                talk_page = requests.get("%s%s" % (site_url, talk_url))
+                talk_soup = BeautifulSoup(talk_page.content, "html.parser")
+                # Get the talk metadata
+                title = talk_soup.find("title").text
+                speaker = \
+                    talk_soup.find("p", class_="author-name").text if talk_soup.find("p", class_="author-name") else ""
+                role = \
+                    talk_soup.find("p", class_="author-role").text if talk_soup.find("p", class_="author-role") else ""
+                summary = talk_soup.find("p", class_="kicker").text if talk_soup.find("p", class_="kicker") \
+                    else ""
+                if verbose:
+                    print("%s\n%s\n%s\n%s" % (title, speaker, role, summary))
 
-                                        if word not in word_list:
-                                            word_list[word] = 0
-                                        word_list[word] += 1
+                talk_paragraphs = talk_soup.findAll("p", id=re.compile(".*"))
+                # iterate over all the paragraphs looking for p# or title# which are the text of the talk
+                for talk_para in talk_paragraphs:
+                    if "id" in talk_para.attrs and \
+                            (re.search(r"^p\d+$", talk_para["id"]) or re.search(r"^title\d+$", talk_para["id"])):
+                        paragraph = talk_para.text
+                        if verbose:
+                            print(paragraph)
+                        sentences = sent_tokenize(paragraph)
+                        for sentence in sentences:
+                            if sentence:
+                                words = word_tokenize(sentence)
+                                for word in words:
+                                    if len(word) == 1 and re.search(r"\W", word):
+                                        continue
+                                    lemma = None
+                                    if language_data is not None and len(language_data) > 0:
+                                        lemma = simplemma.lemmatize(word, language_data)
+                                    if verbose:
+                                        print("%s -> %s" % (word, lemma))
 
-                                        if lemma is not None:
-                                            if lemma not in lemma_list:
-                                                lemma_list[lemma] = 0
-                                            lemma_list[lemma] += 1
-                else:
-                    if verbose:
-                        print("SKIPPING: %s" % talk_url)
+                                    if word not in word_list:
+                                        word_list[word] = 0
+                                    word_list[word] += 1
+
+                                    if lemma is not None:
+                                        if lemma not in lemma_list:
+                                            lemma_list[lemma] = 0
+                                        lemma_list[lemma] += 1
 
     if word_list is not None or lemma_list is not None:
         if word_list is not None:
