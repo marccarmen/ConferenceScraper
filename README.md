@@ -50,8 +50,13 @@ The output of this script is a tab separated list that looks like this<br>
 The Word/Word Count and Lemma/Lemma Count are not related. I output them this
 way so that all the data can be easily imported into a spreadsheet and 
 manipulated as needed. Instructions for importing a txt file into Microsoft 
-Excel are available [here](https://support.microsoft.com/en-us/office/import-or-export-text-txt-or-csv-files-5250ac4c-663c-47ce-937b-339e391393ba).
+Excel are available https://support.microsoft.com/en-us/office/import-or-export-text-txt-or-csv-files-5250ac4c-663c-47ce-937b-339e391393ba 
 
+I have added an output folder with some sample output files. The files that 
+end in <code>.txt</code> are the tab-delimited files and would need to be viewed 
+in a text editor or imported into a spreadsheet program. The files that end in 
+<code>.csv</code> are comma separated files and should be able to be opened 
+directly into most spreadsheet programs.
 # Supported Language Details
 
 A list of the most common languages spoken by members of The Church of Jesus 
