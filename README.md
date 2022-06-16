@@ -83,13 +83,13 @@ The script currently supports the following languages
 <li>Samoan</li>
 <li>Tagalog</li>
 <li>Tongan</li>
-
+<br>
 General Conference proceedings are available in the following languages but are 
 not supported by the script because they cannot be easily split into paragraphs 
 and words.
 <li>Mandarin</li>
 <li>Japanese</li>
-
+<br>
 Lemmatization is not supported for the following languages
 <li>Cebuano</li>
 <li>Hiligaynon</li>
