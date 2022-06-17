@@ -49,11 +49,11 @@ included. If this parameter is included along with an argument greater than
 0 and the target language is not English then the program will attempt
 to provide a translation for any word that has a count larger than
 <code>translationReq</code>.</li>
-<li><code>--translateMax=NUMBER</code>By default this is set to the max integer 
-size but this is only used if the <code>translateMin</code> is also 
-specified. If set then only words that have a count between 
+<li><code>--translateMax=NUMBER</code>By default this is set to the whatever
+<code>translateMin</code> is set to. If set then only words that have a count between 
 <code>translateMin</code> and <code>translateMax</code> will be 
 translated.</li>
+<li><code>--hideCount</code> will hide the count column in the output</li>
 
 # Output
 The output of this script is a tab separated list that looks like the table
@@ -146,12 +146,14 @@ support the following languages:
 
 ## Translation
 
-Translation is done using the <code>translate</code> library
-(https://pypi.org/project/translate/) using the MyMemory provider. The 
-translation is only for non-English languages into English. MyMemory 
-allows up to 5000 free translations per day. As a result, the parameter takes
-a number as input and oly those words that have a higher count than 
-<code>translationMin</code> will be translated.
+Translation is done using the <code>py-googletrans</code> library
+(https://github.com/ssut/py-googletrans). The 
+translation is only for non-English languages into English. The script takes
+a number as input and only those words that have a higher count than 
+<code>translationMin</code> will be translated. If no 
+<code>translationMax</code> is specified then 
+<code>translationMax=translationMin</code>. If the <code>translationMax</code>
+is to large the script will take a very long time to complete.
 
 # Required Libraries
 
@@ -161,8 +163,9 @@ necessary libraries.<br>
 <code>pip install nltk</code><br>
 <code>pip install simplemma</code><br>
 <code>pip install requests</code><br>
-<code>pip install translate</code><br>
+<code>pip install googletrans==4.0.0-rc1</code><br>
 <code>pip install transliterate</code><br>
+<code>pip install tqdm</code><br>
 
 ## NLTK Requirements
 

@@ -7,11 +7,20 @@ from bs4 import BeautifulSoup
 from nltk import sent_tokenize, word_tokenize
 import simplemma
 from transliterate import translit, get_available_language_codes
-from translate import Translator
+from googletrans import Translator
+from tqdm import tqdm
+
 
 # provide the usage
 def usage():
-    print("python -l <LANGUAGE> -y <YEAR> -m <MONTH> -o <OUTPUT>")
+    print("ConferenceScraper [-l <LANGUAGE>] [-y <YEAR>] [-m <MONTH>] [-o <OUTPUT>] "
+          "[--includeLemma] [--includeTransliteration] [--translateMin <NUM>] [--translateMax <NUMBER>] "
+          "[--hideCount] [-v] [-h]")
+    print("SUPPORTED LANGUAGES: bul, ceb, deu, eng, spa, fra, hil, ilo, kor, ita, por, rus, smo, tgl, ton")
+    print("SUPPORTED YEAR FORMATS: yyyy or yyyy-yyyy or yyyy,yyyy,yyyy")
+    print("SUPPORTED MONTHS: 04 or 10 or 04,10")
+    print("DEFAULT: ConferenceScraper -l eng -y <CURRENT_YEAR> -m 04,10")
+    print("EXAMPLE Spanish from 2019-2021 to file: ConferenceScraper -l spa -y 2019-2021 -o output.txt")
 
 
 def run(argv):
@@ -106,13 +115,16 @@ def run(argv):
     show_lemma = False
     show_transliteration = False
     show_translation = False
+    hide_count = False
     min_translation = 0
-    max_translation = sys.maxsize
+    max_translation = None
     verbose = False
 
     # process the input from the command line
     try:
-        opts, args = getopt.getopt(argv, "l:y:m:o:hv", ["language=", "year=", "month=", "output=", "verbose", "includeLemma", "includeTransliteration", "translateMin=", "translateMax="])
+        opts, args = getopt.getopt(argv, "l:y:m:o:hv", ["language=", "year=", "month=", "output=", "verbose",
+                                                        "includeLemma", "includeTransliteration", "translateMin=",
+                                                        "translateMax=", "hideCount"])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -142,6 +154,8 @@ def run(argv):
             show_translation = True if min_translation > 0 else False
         elif opt == "--translateMax":
             max_translation = int(arg)
+        elif opt == "hideCount":
+            hide_count = True
         else:
             assert False, "unhandled option"
 
@@ -172,6 +186,9 @@ def run(argv):
             month = None
     else:
         month = None
+
+    if min_translation > 0 and max_translation is None:
+        max_translation = min_translation
 
     # turn off translation if the language is english
     show_translation = show_translation and lang != "eng"
@@ -224,9 +241,9 @@ def run(argv):
             talk_total = len(talks)
 
             # iterate over each talk URL
-            for talk_link in talks:
+            for talk_link in tqdm(talks, unit=" talks"):
                 talk_count += 1
-                print("Processing talk %d of %d" % (talk_count, talk_total))
+                # print("Processing talk %d of %d" % (talk_count, talk_total))
                 talk_url = talk_link["href"]
                 # the name of the URL always ends with digits and then the last name of the speaker
 
@@ -282,10 +299,12 @@ def run(argv):
 
         translator = None
         if show_translation:
-            translator = Translator(provider="mymemory", to_lang="en", from_lang=iso_one)
+            translator = Translator()
         show_translation = show_translation and translator is not None
 
-        header = "WORD COUNT\tWORD"
+        header = "WORD"
+        if not hide_count:
+            header = "WORD COUNT\t%s" % header
         if show_transliteration:
             header = "%s\t%s" % (header, "TRANSLITERATION")
         if show_lemma and language_data is not None and len(language_data) > 0:
@@ -301,7 +320,7 @@ def run(argv):
             print(header)
 
         word_list = {k: v for k, v in sorted(word_list.items(), key=lambda item: item[1], reverse=True)}
-        for word in word_list:
+        for word in tqdm(word_list, unit=" words", disable=True if output is None else False):
             output_line = "%s\t%s" % (word_list[word], word)
 
             transliteration = None
@@ -315,8 +334,8 @@ def run(argv):
                 output_line = "%s\t%s" % (output_line, lemma if lemma is not None else "")
 
             translation = None
-            if show_translation and max_translation > word_list[word] > min_translation > 0:
-                translation = translator.translate(word)
+            if show_translation and max_translation >= word_list[word] >= min_translation > 0:
+                translation = translator.translate(word, src=iso_one, dest="en").text
                 output_line = "%s\t%s" % (output_line, translation if translation is not None else "")
 
             if output_line is not None:
