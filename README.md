@@ -1,10 +1,10 @@
 # ConferenceScraper
 
-This project was started as a way to generate word and lemma lists based on 
+This project was started as a way to generate word list based on 
 General Conference talks from The Church of Jesus Christ of Latter-day Saints. 
-The lists are ordered by frequency in descending order. The purpose of these 
-lists is to generate word lists related to The Church of Jesus Christ of 
-Latter-day Saints for language learning purposes. 
+The list is ordered by frequency in descending order. The purpose of the 
+list is to generate word lists related to The Church of Jesus Christ of 
+Latter-day Saints for language learning purposes. <br><br>
 In linguistics, lemmatization is "the process of grouping together the inflected 
 forms of a word, so they can be analysed as a single item, identified by the 
 word's lemma, or dictionary form." (https://en.wikipedia.org/wiki/Lemmatisation) 
@@ -38,24 +38,43 @@ command:<br>
 ## Optional Parameters
 
 <li><code>--includeLemma</code> By default the lemma is not included. 
-If this parameter is included then the list of lemmas will be included in the output</li>
+If this parameter is included then the list of lemmas will be included 
+in the output.</li>
+<li><code>--includeTransliteration</code> By default the transliteration is 
+not included. If this parameter is included and the target language is 
+supported then the transliteration of the word will be included
+in the output.</li>
+<li><code>--translateMin=NUMBER</code>By default the translation is not
+included. If this parameter is included along with an argument greater than 
+0 and the target language is not English then the program will attempt
+to provide a translation for any word that has a count larger than
+<code>translationReq</code>.</li>
+<li><code>--translateMax=NUMBER</code>By default this is set to the max integer 
+size but this is only used if the <code>translateMin</code> is also 
+specified. If set then only words that have a count between 
+<code>translateMin</code> and <code>translateMax</code> will be 
+translated.</li>
 
 # Output
-The output of this script is a tab separated list that looks like this<br>
+The output of this script is a tab separated list that looks like the table
+below if all the fields are included<br>
 
-| Word | Word Count |     | Lemma | Lemma Count |
-|------|------------|-----|-------|-------------|
-| the  | 2763       |     | the   | 2089        |
-| and  | 1977	     |     | and   | 2067        |
-| of	| 1817	     |     | be	   | 1840        |
-| to   | 1735       |     | of    | 1826        |
-| in   | 959	     |     | to    | 1754        |
-| a    | 738	     |     | we	   | 1196        |
+| WORD COUNT | WORD | TRANSLITERATION | LEMMA | TRANSLATION |
+|------------|------|-----------------|-------|-------------|
+| 2763       | the  |                 |       |             |
+| 1977       | and	 |                 |       |             |
+| 1817	      | of   |                 |       |             |
+| 1735       | to   |                 |       |             |
+| 959        | in   |                 |       |             |
+| 738        | a	 |                 |       |             |
 <br>
-Lemma/Lemma Count are only included if the <code>--includeLemma</code> parameter
-is set. The Word/Word Count and Lemma/Lemma Count are not related. I output them this
-way so that all the data can be easily imported into a spreadsheet and 
-manipulated as needed. Instructions for importing a txt file into Microsoft 
+TRANSLITERATION is included if <code>--includeTransliteration</code> is set.<br>
+LEMMA is only included if <code>--includeLemma</code> is set.<br>
+TRANSLATION is only included if <code>--translationMin</code> is set with a number 
+greater than 0<br>
+
+The data is output as a tab-delimited file and can be easily imported into 
+most spreadsheet programs. Instructions for importing a txt file into Microsoft 
 Excel are available https://support.microsoft.com/en-us/office/import-or-export-text-txt-or-csv-files-5250ac4c-663c-47ce-937b-339e391393ba 
 
 I have added an output folder with some sample output files. The files that 
@@ -63,7 +82,8 @@ end in <code>.txt</code> are the tab-delimited files and would need to be viewed
 in a text editor or imported into a spreadsheet program. The files that end in 
 <code>.csv</code> are comma separated files and should be able to be opened 
 directly into most spreadsheet programs.
-# Supported Language Details
+
+# Language Details
 
 A list of the most common languages spoken by members of The Church of Jesus 
 Christ of Latter-day Saints can be found here 
@@ -95,8 +115,27 @@ not supported by the script because they cannot be easily split into paragraphs
 and words.
 <li>Mandarin</li>
 <li>Japanese</li>
-<br>
-Lemmatization is not supported for the following languages
+
+## Transliteration
+
+Transliteration is done using the <code>transliterate</code> library 
+(https://github.com/barseghyanartur/transliterate) which supports 
+the following languages:
+<li>Armenian</li>
+<li>Bulgarian (beta)</li>
+<li>Georgian</li>
+<li>Greek</li>
+<li>Macedonian (alpha)</li>
+<li>Mongolian (alpha)</li>
+<li>Russian</li>
+<li>Serbian (alpha)</li>
+<li>Ukrainian (beta)</li>
+
+## Lemmatization
+
+Lemmatization is done using the <code>simplemma</code> library
+(https://pypi.org/project/simplemma/) which currently does <b><u>not</u></b> 
+support the following languages:
 <li>Cebuano</li>
 <li>Hiligaynon</li>
 <li>Ilokano</li>
@@ -104,6 +143,15 @@ Lemmatization is not supported for the following languages
 <li>Samoan</li>
 <li>Tagalog</li>
 <li>Tongan</li>
+
+## Translation
+
+Translation is done using the <code>translate</code> library
+(https://pypi.org/project/translate/) using the MyMemory provider. The 
+translation is only for non-English languages into English. MyMemory 
+allows up to 5000 free translations per day. As a result, the parameter takes
+a number as input and oly those words that have a higher count than 
+<code>translationMin</code> will be translated.
 
 # Required Libraries
 
@@ -113,21 +161,16 @@ necessary libraries.<br>
 <code>pip install nltk</code><br>
 <code>pip install simplemma</code><br>
 <code>pip install requests</code><br>
+<code>pip install translate</code><br>
+<code>pip install transliterate</code><br>
 
-# NLTK Requirements
+## NLTK Requirements
 
 After you have installed NLTK you will need to install the following 
 resources:
 <br>
 <code>import nltk</code><br>
 <code>nltk.download('punkt')</code>
-
-# Known Issues
-
-- [X] Compatible with talks 2019 and on. System is filtering out older talks
-  due to the filename format<br>
-- [X] Year and Month parameters support a variety of formats. It needs more
-  error checking to prevent issues. Specifically spaces should be stripped
 
 # Potential Features
 - [ ] More linguistic processing. Part of speech

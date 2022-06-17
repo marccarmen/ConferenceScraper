@@ -6,7 +6,8 @@ import requests
 from bs4 import BeautifulSoup
 from nltk import sent_tokenize, word_tokenize
 import simplemma
-
+from transliterate import translit, get_available_language_codes
+from translate import Translator
 
 # provide the usage
 def usage():
@@ -103,11 +104,15 @@ def run(argv):
     output = None
 
     show_lemma = False
+    show_transliteration = False
+    show_translation = False
+    min_translation = 0
+    max_translation = sys.maxsize
     verbose = False
 
     # process the input from the command line
     try:
-        opts, args = getopt.getopt(argv, "l:y:m:o:hv", ["language=", "year=", "month=", "output=", "verbose", "includeLemma"])
+        opts, args = getopt.getopt(argv, "l:y:m:o:hv", ["language=", "year=", "month=", "output=", "verbose", "includeLemma", "includeTransliteration", "translateMin=", "translateMax="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -130,6 +135,13 @@ def run(argv):
             output = arg
         elif opt == "--includeLemma":
             show_lemma = True
+        elif opt == "--includeTransliteration":
+            show_transliteration = True
+        elif opt == "--translateMin":
+            min_translation = int(arg)
+            show_translation = True if min_translation > 0 else False
+        elif opt == "--translateMax":
+            max_translation = int(arg)
         else:
             assert False, "unhandled option"
 
@@ -161,6 +173,9 @@ def run(argv):
     else:
         month = None
 
+    # turn off translation if the language is english
+    show_translation = show_translation and lang != "eng"
+
     # exit the script if there are invalid arguments
     arg_error = False
     if lang is None:
@@ -179,14 +194,12 @@ def run(argv):
         usage()
         sys.exit(2)
 
-    # the final dictionaries we are going to output. Will contain a word/lemma as a key along with a count
+    # the final dictionaries we are going to output. Will contain a word as a key along with a count
     word_list = {}
-    lemma_list = {}
 
     # Get the url setup
     lang_url = lang
     site_url = "https://www.churchofjesuschrist.org"
-    language_data = simplemma.load_data(available_languages[lang]["iso_one"])
 
     # iterate over one or more years
     for year in years:
@@ -249,52 +262,66 @@ def run(argv):
                                 for word in words:
                                     if len(word) == 1 and re.search(r"\W", word):
                                         continue
-                                    lemma = None
-                                    if show_lemma and language_data is not None and len(language_data) > 0:
-                                        lemma = simplemma.lemmatize(word, language_data)
-                                    if verbose:
-                                        print("%s -> %s" % (word, lemma))
 
                                     if word not in word_list:
                                         word_list[word] = 0
                                     word_list[word] += 1
 
-                                    if lemma is not None:
-                                        if lemma not in lemma_list:
-                                            lemma_list[lemma] = 0
-                                        lemma_list[lemma] += 1
+    if word_list is not None:
+        iso_one = available_languages[lang]["iso_one"]
 
-    if word_list is not None or lemma_list is not None:
-        if word_list is not None:
-            word_list = {k: v for k, v in sorted(word_list.items(), key=lambda item: item[1], reverse=True)}
+        transliteration_languages = None
+        if show_transliteration:
+            transliteration_languages = get_available_language_codes()
+        show_transliteration = show_transliteration and transliteration_languages is not None and iso_one in transliteration_languages
 
-        if show_lemma and lemma_list is not None:
-            lemma_list = {k: v for k, v in sorted(lemma_list.items(), key=lambda item: item[1], reverse=True)}
-
-        print_count = 0
-        word_keys = list(word_list.keys())
-        lemma_keys = list(lemma_list.keys())
-        max_count = max(len(word_keys), len(lemma_keys))
-        f = None
-        header = "WORD\tWORD COUNT"
+        language_data = None
         if show_lemma:
-            header = "%s%s" % (header, "\t\tLEMMA\tLEMMA COUNT")
-        header = "%s%s" % (header, "\n")
+            language_data = simplemma.load_data(iso_one)
+        show_lemma = show_lemma and language_data is not None
+
+        translator = None
+        if show_translation:
+            translator = Translator(provider="mymemory", to_lang="en", from_lang=iso_one)
+        show_translation = show_translation and translator is not None
+
+        header = "WORD COUNT\tWORD"
+        if show_transliteration:
+            header = "%s\t%s" % (header, "TRANSLITERATION")
+        if show_lemma and language_data is not None and len(language_data) > 0:
+            header = "%s\t%s" % (header, "LEMMA")
+        if show_translation:
+            header = "%s\t%s" % (header, "TRANSLATION")
+        header = "%s\n" % header
+        f = None
         if output is not None:
             f = open(output, mode="w", encoding="utf-8")
             f.write(header)
         else:
             print(header)
-        while print_count <= max_count:
-            word = word_keys[print_count] if print_count < len(word_keys) else ""
-            word_count = word_list[word] if word != "" else ""
-            lemma = lemma_keys[print_count] if print_count < len(lemma_keys) else ""
-            lemma_count = lemma_list[lemma] if lemma != "" else ""
-            line = "%s\t%s\t\t%s\t%s" % (word, word_count, lemma, lemma_count)
-            if f is not None and output is not None:
-                f.write("%s%s" % (line, "\n"))
-            else:
-                print(line)
-            print_count += 1
-        if f is not None and output is not None:
-            f.close()
+
+        word_list = {k: v for k, v in sorted(word_list.items(), key=lambda item: item[1], reverse=True)}
+        for word in word_list:
+            output_line = "%s\t%s" % (word_list[word], word)
+
+            transliteration = None
+            if show_transliteration:
+                transliteration = translit(word, iso_one, reversed=True)
+                output_line = "%s\t%s" % (output_line, transliteration if transliteration is not None else "")
+
+            lemma = None
+            if show_lemma and language_data is not None and len(language_data) > 0:
+                lemma = simplemma.lemmatize(word, language_data)
+                output_line = "%s\t%s" % (output_line, lemma if lemma is not None else "")
+
+            translation = None
+            if show_translation and max_translation > word_list[word] > min_translation > 0:
+                translation = translator.translate(word)
+                output_line = "%s\t%s" % (output_line, translation if translation is not None else "")
+
+            if output_line is not None:
+                if output is not None:
+                    f.write("%s%s" % (output_line, "\n"))
+                else:
+                    if output_line is not None:
+                        print(output_line)
