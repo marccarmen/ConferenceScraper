@@ -83,6 +83,13 @@ in a text editor or imported into a spreadsheet program. The files that end in
 <code>.csv</code> are comma separated files and should be able to be opened 
 directly into most spreadsheet programs.
 
+## How to Use the Output
+
+You can obviously use the output as you see fit. One option would be to import the 
+information into an Anki deck to practice the words. In the Output folder there is a file 
+named 2019-2022_bul_ankiImport.csv that I created based on the output. I used that to create an
+Anki deck that is shared at https://ankiweb.net/shared/info/955133302
+
 # Language Details
 
 A list of the most common languages spoken by members of The Church of Jesus 
