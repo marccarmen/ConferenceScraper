@@ -32,76 +32,111 @@ def usage():
 def run(argv):
     """
     # Unsupported by stanza
-        "ceb": {
-            "iso_name": "Cebuano",
-            "iso_one": ""
-        },
-        "hil": {
-            "iso_name": "Hiligaynon",
-            "iso_one": ""
-        },
-        "ilo": {
-            "iso_name": "Ilokano",
-            "iso_one": ""
-        },
-        "smo": {
-            "iso_name": "Samoan",
-            "iso_one": "sm"
-        },
-        "tgl": {
-            "iso_name": "Tagalog",
-            "iso_one": "tl"
-        },
-        "ton": {
-            "iso_name": "Tongan",
-            "iso_one": "to"
-        }
+
     """
     # ISO 639 information
     available_languages = {
         "bul": {
             "iso_name": "Bulgarian",
-            "iso_one": "bg"
+            "iso_one": "bg",
+            "pos": True,
+            "lemma": True
         },
         "deu": {
             "iso_name": "German",
-            "iso_one": "de"
+            "iso_one": "de",
+            "pos": True,
+            "lemma": True
         },
         "eng": {
             "iso_name": "English",
-            "iso_one": "en"
+            "iso_one": "en",
+            "pos": True,
+            "lemma": True
         },
         "spa": {
             "iso_name": "Spanish",
-            "iso_one": "es"
+            "iso_one": "es",
+            "pos": True,
+            "lemma": True
         },
         "fra": {
             "iso_name": "French",
-            "iso_one": "fr"
+            "iso_one": "fr",
+            "pos": True,
+            "lemma": True
         },
         "kor": {
             "iso_name": "Korean",
-            "iso_one": "ko"
+            "iso_one": "ko",
+            "pos": True,
+            "lemma": True
         },
         "ita": {
             "iso_name": "Italian",
-            "iso_one": "it"
+            "iso_one": "it",
+            "pos": True,
+            "lemma": True
         },
         "por": {
             "iso_name": "Portuguese",
-            "iso_one": "pt"
+            "iso_one": "pt",
+            "pos": True,
+            "lemma": True
         },
         "rus": {
             "iso_name": "Russian",
-            "iso_one": "ru"
+            "iso_one": "ru",
+            "pos": True,
+            "lemma": True
         },
         "zho": {
             "iso_name": "Chinese (Mandarin)",
-            "iso_one": "zh"
+            "iso_one": "zh",
+            "pos": True,
+            "lemma": True
         },
         "jpn": {
             "iso_name": "Japanese",
-            "iso_one": "ja"
+            "iso_one": "ja",
+            "pos": True,
+            "lemma": True
+        },
+        "ceb": {
+            "iso_name": "Cebuano",
+            "iso_one": "",
+            "pos": False,
+            "lemma": False
+        },
+        "hil": {
+            "iso_name": "Hiligaynon",
+            "iso_one": "",
+            "pos": False,
+            "lemma": False
+        },
+        "ilo": {
+            "iso_name": "Ilokano",
+            "iso_one": "",
+            "pos": False,
+            "lemma": False
+        },
+        "smo": {
+            "iso_name": "Samoan",
+            "iso_one": "sm",
+            "pos": False,
+            "lemma": False
+        },
+        "tgl": {
+            "iso_name": "Tagalog",
+            "iso_one": "tl",
+            "pos": False,
+            "lemma": False
+        },
+        "ton": {
+            "iso_name": "Tongan",
+            "iso_one": "to",
+            "pos": False,
+            "lemma": False
         }
     }
 
@@ -122,7 +157,6 @@ def run(argv):
     max_translation = None
     verbose = False
     show_pos = False
-    exclude_pos = ["PUNCT", "NUM", "AUX", "PROPN"]
     show_sentence = False
 
     # process the input from the command line
@@ -294,87 +328,103 @@ def run(argv):
                         paragraph = talk_para.text
                         if verbose:
                             print(paragraph)
-
-                        doc = nlp(paragraph)
-                        for i, sentence in enumerate(doc.sentences):
-                            for word in sentence.words:
-                                if word.pos not in exclude_pos:
-                                    lcase = word.text.lower()
-                                    if lcase not in word_list:
-                                        word_list[lcase] = 1
-
-                                        word_features[lcase] = {
-                                            'raw': [word.text],
-                                            'sentences': [sentence.text],
-                                            'pos': word.pos,
-                                            'upos': word.upos,
-                                            'xpos': word.xpos,
-                                            'feats': word.feats,
-                                            'lemma': word.lemma,
-                                            'transliteration': translit(word.text, iso_one, reversed=True) if show_transliteration else ""
-                                        }
-                                    else:
-                                        word_list[lcase] += 1
-                                        if word not in word_features[lcase]['raw']:
-                                            word_features[lcase]['raw'].append(word)
-                                        if sentence not in word_features[lcase]['sentences']:
-                                            word_features[lcase]['sentences'].append(sentence.text)
+                        word_list, word_features = process_paragraph(nlp, paragraph, word_list, word_features, iso_one, show_transliteration)
 
     if word_list is not None:
-        translator = None
-        if show_translation:
-            translator = Translator()
-        show_translation = show_translation and translator is not None
+        print_output(output, iso_one, word_list, word_features,
+                     hide_count, show_transliteration, show_lemma,
+                     show_translation, show_pos, show_sentence,
+                     max_translation, min_translation
+                     )
 
-        header = "WORD"
-        if not hide_count:
-            header = "WORD COUNT\t%s" % header
-        if show_transliteration:
-            header = "%s\tTRANSLITERATION" % header
-        if show_lemma:
-            header = "%s\tLEMMA" % header
-        if show_translation:
-            header = "%s\tTRANSLATION" % header
-        if show_pos:
-            # header = "%s\tPOS\tUPOS\tXPOS\tFEATURES" % header
-            header = "%s\t\"Part of Speech\"" % header
-        if show_sentence:
-            header = "%s\tSENTENCE" % header
-        header = "%s\n" % header
-        f = None
-        if output is not None:
-            f = open(output, mode="w", encoding="utf-8")
-            f.write(header)
-        else:
-            print(header)
 
-        word_list = {k: v for k, v in sorted(word_list.items(), key=lambda item: item[1], reverse=True)}
-        for word in tqdm(word_list, unit=" words", disable=True if output is None else False):
-            output_line = "%s\t%s" % (word_list[word], word)
+def process_paragraph(nlp, paragraph, word_list, word_features, iso_one, show_transliteration):
+    exclude_pos = ["PUNCT", "NUM", "AUX", "PROPN"]
+    doc = nlp(paragraph)
+    for i, sentence in enumerate(doc.sentences):
+        for word in sentence.words:
+            if word.pos not in exclude_pos:
+                lcase = word.text.lower()
+                if lcase not in word_list:
+                    word_list[lcase] = 1
 
-            features = word_features[word]
-
-            if show_transliteration:
-                output_line = "%s\t%s" % (output_line, features['transliteration'] if features['transliteration'] is not None else "")
-
-            if show_lemma:
-                output_line = "%s\t%s" % (output_line, features['lemma'] if features['lemma'] is not None else "")
-
-            if show_translation and max_translation >= word_list[word] >= min_translation > 0:
-                translation = translator.translate(word, src=iso_one, dest="en").text
-                output_line = "%s\t%s" % (output_line, translation if translation is not None else "")
-
-            if show_pos:
-                # output_line = "%s\t%s\t%s\t%s\t%s" % (output_line, features['pos'], features['upos'], features['xpos'], features['feats'])
-                output_line = "%s\t%s" % (output_line, features['pos'])
-
-            if show_sentence:
-                random_int = random.randint(1, len(features['sentences'])) - 1
-                output_line = "%s\t\"%s\"" % (output_line, features['sentences'][random_int])
-
-            if output_line is not None:
-                if output is not None:
-                    f.write("%s%s" % (output_line, "\n"))
+                    word_features[lcase] = {
+                        'raw': [word.text],
+                        'sentences': [sentence.text],
+                        'pos': word.pos,
+                        'upos': word.upos,
+                        'xpos': word.xpos,
+                        'feats': word.feats,
+                        'lemma': word.lemma,
+                        'transliteration': translit(word.text, iso_one, reversed=True) if show_transliteration else ""
+                    }
                 else:
-                    if output_line is not None:
-                        print(output_line)
+                    word_list[lcase] += 1
+                    if word not in word_features[lcase]['raw']:
+                        word_features[lcase]['raw'].append(word)
+                    if sentence not in word_features[lcase]['sentences']:
+                        word_features[lcase]['sentences'].append(sentence.text)
+    return word_list, word_features
+
+
+def print_output(output, iso_one,word_list, word_features,
+                 hide_count, show_transliteration, show_lemma,
+                 show_translation, show_pos, show_sentence,
+                 max_translation, min_translation):
+    translator = None
+    if show_translation:
+        translator = Translator()
+    show_translation = show_translation and translator is not None
+
+    header = "WORD"
+    if not hide_count:
+        header = "WORD COUNT\t%s" % header
+    if show_transliteration:
+        header = "%s\tTRANSLITERATION" % header
+    if show_lemma:
+        header = "%s\tLEMMA" % header
+    if show_translation:
+        header = "%s\tTRANSLATION" % header
+    if show_pos:
+        # header = "%s\tPOS\tUPOS\tXPOS\tFEATURES" % header
+        header = "%s\t\"Part of Speech\"" % header
+    if show_sentence:
+        header = "%s\tSENTENCE" % header
+    header = "%s\n" % header
+    f = None
+    if output is not None:
+        f = open(output, mode="w", encoding="utf-8")
+        f.write(header)
+    else:
+        print(header)
+
+    word_list = {k: v for k, v in sorted(word_list.items(), key=lambda item: item[1], reverse=True)}
+    for word in tqdm(word_list, unit=" words", disable=True if output is None else False):
+        output_line = "%s\t%s" % (word_list[word], word)
+
+        features = word_features[word]
+
+        if show_transliteration:
+            output_line = "%s\t%s" % (output_line, features['transliteration'] if features['transliteration'] is not None else "")
+
+        if show_lemma:
+            output_line = "%s\t%s" % (output_line, features['lemma'] if features['lemma'] is not None else "")
+
+        if show_translation and max_translation >= word_list[word] >= min_translation > 0:
+            translation = translator.translate(word, src=iso_one, dest="en").text
+            output_line = "%s\t%s" % (output_line, translation if translation is not None else "")
+
+        if show_pos:
+            # output_line = "%s\t%s\t%s\t%s\t%s" % (output_line, features['pos'], features['upos'], features['xpos'], features['feats'])
+            output_line = "%s\t%s" % (output_line, features['pos'])
+
+        if show_sentence:
+            random_int = random.randint(1, len(features['sentences'])) - 1
+            output_line = "%s\t\"%s\"" % (output_line, features['sentences'][random_int])
+
+        if output_line is not None:
+            if output is not None:
+                f.write("%s%s" % (output_line, "\n"))
+            else:
+                if output_line is not None:
+                    print(output_line)
