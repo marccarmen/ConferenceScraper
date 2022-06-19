@@ -23,6 +23,14 @@ word. This is useful for this script because there are certain words that
 are very frequent and may not be useful in the output. The script currently 
 excludes punctuation, proper nouns, numbers, and auxiliary words
 
+The first time you run the script on a language that Stanza supports it will
+download a language model for that language. This can take some time depending 
+on the size of the model. Once that has been downloaded you will not need
+to download that information for that language model again.
+
+In a future update, I plan to add a caching mechanism that will save a local copy 
+of the conference years that the user processes. This should speed up the process.
+
 # Usage
 
 The script has been developed using Python 3.10. There are several libraries 
@@ -126,11 +134,6 @@ information can be found here https://www.loc.gov/standards/iso639-2/php/code_li
 <li>Portuguese</li>
 <li>Russian</li>
 <li>Spanish</li>
-
-## Unsupported Languages
-
-The Stanza library currently doesn't offer support for the following
-languages:
 <li>Cebuano</li>
 <li>Hiligaynon</li>
 <li>Ilokano</li>
@@ -174,3 +177,5 @@ necessary libraries.<br>
 <code>pip install googletrans==4.0.0-rc1</code><br>
 <code>pip install transliterate</code><br>
 <code>pip install stanza</code><br>
+<code>pip install nltk</code><br>
+<code>pip install simplemma</code><br>
