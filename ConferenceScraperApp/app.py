@@ -2,21 +2,27 @@ import sys
 import getopt
 from datetime import date
 import re
-import requests
-from bs4 import BeautifulSoup
-from nltk import sent_tokenize, word_tokenize
-import simplemma
-from transliterate import translit, get_available_language_codes
-from googletrans import Translator
+import random
+# Progress bar
 from tqdm import tqdm
+# Web requests
+import requests
+# Web scraping
+from bs4 import BeautifulSoup
+# Transliteration
+from transliterate import translit, get_available_language_codes
+# Translation
+from googletrans import Translator
+# Linguistic Processing
+import stanza
 
 
 # provide the usage
 def usage():
     print("ConferenceScraper [-l <LANGUAGE>] [-y <YEAR>] [-m <MONTH>] [-o <OUTPUT>] "
           "[--includeLemma] [--includeTransliteration] [--translateMin <NUM>] [--translateMax <NUMBER>] "
-          "[--hideCount] [-v] [-h]")
-    print("SUPPORTED LANGUAGES: bul, ceb, deu, eng, spa, fra, hil, ilo, kor, ita, por, rus, smo, tgl, ton")
+          "[--hideCount] [-v] [-h] [--showPOS] [--showSentence]")
+    print("SUPPORTED LANGUAGES: bul, deu, eng, spa, fra, kor, ita, por, rus")
     print("SUPPORTED YEAR FORMATS: yyyy or yyyy-yyyy or yyyy,yyyy,yyyy")
     print("SUPPORTED MONTHS: 04 or 10 or 04,10")
     print("DEFAULT: ConferenceScraper -l eng -y <CURRENT_YEAR> -m 04,10")
@@ -25,30 +31,37 @@ def usage():
 
 def run(argv):
     """
-    # Languages that don't support tokenization and lemmatization
-        "zho": {
-            "iso_name": "Chinese (Mandarin)",
-            "iso_one": "zh"
-        },
-        "jpn": {
-            "iso_name": "Japanese",
-            "iso_one": "ja"
-        },
-    # Languages with no translation available
-        "bik": {
-            "iso_name": "Bikol",
+    # Unsupported by stanza
+        "ceb": {
+            "iso_name": "Cebuano",
             "iso_one": ""
         },
+        "hil": {
+            "iso_name": "Hiligaynon",
+            "iso_one": ""
+        },
+        "ilo": {
+            "iso_name": "Ilokano",
+            "iso_one": ""
+        },
+        "smo": {
+            "iso_name": "Samoan",
+            "iso_one": "sm"
+        },
+        "tgl": {
+            "iso_name": "Tagalog",
+            "iso_one": "tl"
+        },
+        "ton": {
+            "iso_name": "Tongan",
+            "iso_one": "to"
+        }
     """
     # ISO 639 information
     available_languages = {
         "bul": {
             "iso_name": "Bulgarian",
             "iso_one": "bg"
-        },
-        "ceb": {
-            "iso_name": "Cebuano",
-            "iso_one": ""
         },
         "deu": {
             "iso_name": "German",
@@ -66,14 +79,6 @@ def run(argv):
             "iso_name": "French",
             "iso_one": "fr"
         },
-        "hil": {
-            "iso_name": "Hiligaynon",
-            "iso_one": ""
-        },
-        "ilo": {
-            "iso_name": "Ilokano",
-            "iso_one": ""
-        },
         "kor": {
             "iso_name": "Korean",
             "iso_one": "ko"
@@ -90,19 +95,16 @@ def run(argv):
             "iso_name": "Russian",
             "iso_one": "ru"
         },
-        "smo": {
-            "iso_name": "Samoan",
-            "iso_one": "sm"
+        "zho": {
+            "iso_name": "Chinese (Mandarin)",
+            "iso_one": "zh"
         },
-        "tgl": {
-            "iso_name": "Tagalog",
-            "iso_one": "tl"
-        },
-        "ton": {
-            "iso_name": "Tongan",
-            "iso_one": "to"
+        "jpn": {
+            "iso_name": "Japanese",
+            "iso_one": "ja"
         }
     }
+
     # ISO 639-2 Code
     lang = "eng"
     # four digit year, two four digit years separated by -, list of four digit year separated by comma
@@ -119,12 +121,15 @@ def run(argv):
     min_translation = 0
     max_translation = None
     verbose = False
+    show_pos = False
+    exclude_pos = ["PUNCT", "NUM", "AUX", "PROPN"]
+    show_sentence = False
 
     # process the input from the command line
     try:
         opts, args = getopt.getopt(argv, "l:y:m:o:hv", ["language=", "year=", "month=", "output=", "verbose",
                                                         "includeLemma", "includeTransliteration", "translateMin=",
-                                                        "translateMax=", "hideCount"])
+                                                        "translateMax=", "hideCount", "showPOS", "showSentence"])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -154,8 +159,12 @@ def run(argv):
             show_translation = True if min_translation > 0 else False
         elif opt == "--translateMax":
             max_translation = int(arg)
-        elif opt == "hideCount":
+        elif opt == "--hideCount":
             hide_count = True
+        elif opt == "--showPOS":
+            show_pos = True
+        elif opt == "--showSentence":
+            show_sentence = True
         else:
             assert False, "unhandled option"
 
@@ -211,14 +220,28 @@ def run(argv):
         usage()
         sys.exit(2)
 
+    # Get the 639-1 code for the language
+    iso_one = available_languages[lang]["iso_one"]
+
+    # Setup stanza for the target language
+    stanza.download(iso_one)
+    nlp = stanza.Pipeline(lang=iso_one, processors='tokenize,pos,lemma')
+
     # the final dictionaries we are going to output. Will contain a word as a key along with a count
     word_list = {}
+    word_features = {}
 
     # Get the url setup
     lang_url = lang
     site_url = "https://www.churchofjesuschrist.org"
 
-    # iterate over one or more years
+    transliteration_languages = None
+    if show_transliteration:
+        transliteration_languages = get_available_language_codes()
+    show_transliteration = show_transliteration and transliteration_languages is not None and iso_one in transliteration_languages
+
+
+# iterate over one or more years
     for year in years:
         # iterate over one or more months
         for month in months:
@@ -238,7 +261,6 @@ def run(argv):
 
             # these variables are only used for providing progress update
             talk_count = 0
-            talk_total = len(talks)
 
             # iterate over each talk URL
             for talk_link in tqdm(talks, unit=" talks"):
@@ -272,31 +294,33 @@ def run(argv):
                         paragraph = talk_para.text
                         if verbose:
                             print(paragraph)
-                        sentences = sent_tokenize(paragraph)
-                        for sentence in sentences:
-                            if sentence:
-                                words = word_tokenize(sentence)
-                                for word in words:
-                                    if len(word) == 1 and re.search(r"\W", word):
-                                        continue
 
-                                    if word not in word_list:
-                                        word_list[word] = 0
-                                    word_list[word] += 1
+                        doc = nlp(paragraph)
+                        for i, sentence in enumerate(doc.sentences):
+                            for word in sentence.words:
+                                if word.pos not in exclude_pos:
+                                    lcase = word.text.lower()
+                                    if lcase not in word_list:
+                                        word_list[lcase] = 1
+
+                                        word_features[lcase] = {
+                                            'raw': [word.text],
+                                            'sentences': [sentence.text],
+                                            'pos': word.pos,
+                                            'upos': word.upos,
+                                            'xpos': word.xpos,
+                                            'feats': word.feats,
+                                            'lemma': word.lemma,
+                                            'transliteration': translit(word.text, iso_one, reversed=True) if show_transliteration else ""
+                                        }
+                                    else:
+                                        word_list[lcase] += 1
+                                        if word not in word_features[lcase]['raw']:
+                                            word_features[lcase]['raw'].append(word)
+                                        if sentence not in word_features[lcase]['sentences']:
+                                            word_features[lcase]['sentences'].append(sentence.text)
 
     if word_list is not None:
-        iso_one = available_languages[lang]["iso_one"]
-
-        transliteration_languages = None
-        if show_transliteration:
-            transliteration_languages = get_available_language_codes()
-        show_transliteration = show_transliteration and transliteration_languages is not None and iso_one in transliteration_languages
-
-        language_data = None
-        if show_lemma:
-            language_data = simplemma.load_data(iso_one)
-        show_lemma = show_lemma and language_data is not None
-
         translator = None
         if show_translation:
             translator = Translator()
@@ -306,11 +330,16 @@ def run(argv):
         if not hide_count:
             header = "WORD COUNT\t%s" % header
         if show_transliteration:
-            header = "%s\t%s" % (header, "TRANSLITERATION")
-        if show_lemma and language_data is not None and len(language_data) > 0:
-            header = "%s\t%s" % (header, "LEMMA")
+            header = "%s\tTRANSLITERATION" % header
+        if show_lemma:
+            header = "%s\tLEMMA" % header
         if show_translation:
-            header = "%s\t%s" % (header, "TRANSLATION")
+            header = "%s\tTRANSLATION" % header
+        if show_pos:
+            # header = "%s\tPOS\tUPOS\tXPOS\tFEATURES" % header
+            header = "%s\t\"Part of Speech\"" % header
+        if show_sentence:
+            header = "%s\tSENTENCE" % header
         header = "%s\n" % header
         f = None
         if output is not None:
@@ -323,20 +352,25 @@ def run(argv):
         for word in tqdm(word_list, unit=" words", disable=True if output is None else False):
             output_line = "%s\t%s" % (word_list[word], word)
 
-            transliteration = None
+            features = word_features[word]
+
             if show_transliteration:
-                transliteration = translit(word, iso_one, reversed=True)
-                output_line = "%s\t%s" % (output_line, transliteration if transliteration is not None else "")
+                output_line = "%s\t%s" % (output_line, features['transliteration'] if features['transliteration'] is not None else "")
 
-            lemma = None
-            if show_lemma and language_data is not None and len(language_data) > 0:
-                lemma = simplemma.lemmatize(word, language_data)
-                output_line = "%s\t%s" % (output_line, lemma if lemma is not None else "")
+            if show_lemma:
+                output_line = "%s\t%s" % (output_line, features['lemma'] if features['lemma'] is not None else "")
 
-            translation = None
             if show_translation and max_translation >= word_list[word] >= min_translation > 0:
                 translation = translator.translate(word, src=iso_one, dest="en").text
                 output_line = "%s\t%s" % (output_line, translation if translation is not None else "")
+
+            if show_pos:
+                # output_line = "%s\t%s\t%s\t%s\t%s" % (output_line, features['pos'], features['upos'], features['xpos'], features['feats'])
+                output_line = "%s\t%s" % (output_line, features['pos'])
+
+            if show_sentence:
+                random_int = random.randint(1, len(features['sentences'])) - 1
+                output_line = "%s\t\"%s\"" % (output_line, features['sentences'][random_int])
 
             if output_line is not None:
                 if output is not None:

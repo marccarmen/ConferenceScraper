@@ -1,22 +1,33 @@
 # ConferenceScraper
 
 This project was started as a way to generate word list based on 
-General Conference talks from The Church of Jesus Christ of Latter-day Saints. 
-The list is ordered by frequency in descending order. The purpose of the 
-list is to generate word lists related to The Church of Jesus Christ of 
-Latter-day Saints for language learning purposes. <br><br>
-In linguistics, lemmatization is "the process of grouping together the inflected 
+General Conference talks from The Church of Jesus Christ of Latter-day Saints 
+for language learning purposes. The list is ordered by frequency in 
+descending order.<br><br> This script uses several common techniques for 
+linguistic processing including segmentation, tokenization, lemmatization, 
+and part of speech tagging.
+
+Segmentation and tokenization are the process of splitting large chunks of 
+data into smaller chunks. In this case, segmentation is the process of breaking
+the paragraphs into sentences. Tokenization is the process of breaking each
+sentence into words.
+
+Lemmatization is "the process of grouping together the inflected 
 forms of a word, so they can be analysed as a single item, identified by the 
 word's lemma, or dictionary form." (https://en.wikipedia.org/wiki/Lemmatisation) 
 The simplemma Python library is being used for lemmatization and not all 
 languages are supported.
 
+Part of speech tagging is the process of determining the part of speech of each 
+word. This is useful for this script because there are certain words that 
+are very frequent and may not be useful in the output. The script currently 
+excludes punctuation, proper nouns, numbers, and auxiliary words
+
 # Usage
 
 The script has been developed using Python 3.10. There are several libraries 
 that are required for the script. Please see 
-[Required Libraries](#required-libraries) and 
-[NLTK Requirements](#nltk-requirements) for additional details. The script can 
+[Required Libraries](#required-libraries)  for additional details. The script can 
 be run with the following parameters:
 <li><code>-l</code> or <code>--language</code> which is the ISO 639-2 Code 
 (e.g., <code>eng</code> or <code>spa</code>
@@ -54,6 +65,9 @@ to provide a translation for any word that has a count larger than
 <code>translateMin</code> and <code>translateMax</code> will be 
 translated.</li>
 <li><code>--hideCount</code> will hide the count column in the output</li>
+<li><code>--showPOS</code> includes the part of speech for each word</li>
+<li><code>--showSentence</code> include a randomly chosen sample sentence for each word</li>
+
 
 # Output
 The output of this script is a tab separated list that looks like the table
@@ -100,28 +114,29 @@ Additional languages could be added to the script by updating the
 <code>available_languages</code> variable. ISO 639 codes are used and more 
 information can be found here https://www.loc.gov/standards/iso639-2/php/code_list.php
 
-The script currently supports the following languages
+## Supported Languages
 <li>Bulgarian</li>
-<li>Cebuano</li>
-<li>German</li>
 <li>English</li>
-<li>Spanish</li>
 <li>French</li>
-<li>Hiligaynon</li>
-<li>Ilokano</li>
-<li>Korean</li>
+<li>German</li>
 <li>Italian</li>
+<li>Japanese</li>
+<li>Korean</li>
+<li>Mandarin</li>
 <li>Portuguese</li>
 <li>Russian</li>
+<li>Spanish</li>
+
+## Unsupported Languages
+
+The Stanza library currently doesn't offer support for the following
+languages:
+<li>Cebuano</li>
+<li>Hiligaynon</li>
+<li>Ilokano</li>
 <li>Samoan</li>
 <li>Tagalog</li>
 <li>Tongan</li>
-<br>
-General Conference proceedings are available in the following languages but are 
-not supported by the script because they cannot be easily split into paragraphs 
-and words.
-<li>Mandarin</li>
-<li>Japanese</li>
 
 ## Transliteration
 
@@ -138,19 +153,6 @@ the following languages:
 <li>Serbian (alpha)</li>
 <li>Ukrainian (beta)</li>
 
-## Lemmatization
-
-Lemmatization is done using the <code>simplemma</code> library
-(https://pypi.org/project/simplemma/) which currently does <b><u>not</u></b> 
-support the following languages:
-<li>Cebuano</li>
-<li>Hiligaynon</li>
-<li>Ilokano</li>
-<li>Korean</li>
-<li>Samoan</li>
-<li>Tagalog</li>
-<li>Tongan</li>
-
 ## Translation
 
 Translation is done using the <code>py-googletrans</code> library
@@ -166,22 +168,9 @@ is to large the script will take a very long time to complete.
 
 The uses several libraries. Please use the commands below to install the 
 necessary libraries.<br>
-<code>pip install beautifulsoup4</code><br>
-<code>pip install nltk</code><br>
-<code>pip install simplemma</code><br>
+<code>pip install tqdm</code><br>
 <code>pip install requests</code><br>
+<code>pip install beautifulsoup4</code><br>
 <code>pip install googletrans==4.0.0-rc1</code><br>
 <code>pip install transliterate</code><br>
-<code>pip install tqdm</code><br>
-
-## NLTK Requirements
-
-After you have installed NLTK you will need to install the following 
-resources:
-<br>
-<code>import nltk</code><br>
-<code>nltk.download('punkt')</code>
-
-# Potential Features
-- [ ] More linguistic processing. Part of speech
-- [ ] Executable version so anyone can use it without programming knowledge
+<code>pip install stanza</code><br>
