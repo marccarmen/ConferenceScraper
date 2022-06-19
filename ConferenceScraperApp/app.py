@@ -15,6 +15,9 @@ from transliterate import translit, get_available_language_codes
 from googletrans import Translator
 # Linguistic Processing
 import stanza
+# Linguistic processing for other languages
+from nltk import sent_tokenize, word_tokenize
+import simplemma
 
 
 # provide the usage
@@ -256,10 +259,22 @@ def run(argv):
 
     # Get the 639-1 code for the language
     iso_one = available_languages[lang]["iso_one"]
+    pos_support = available_languages[lang]["pos"]
 
-    # Setup stanza for the target language
-    stanza.download(iso_one)
-    nlp = stanza.Pipeline(lang=iso_one, processors='tokenize,pos,lemma')
+    transliteration_languages = None
+    if show_transliteration:
+        transliteration_languages = get_available_language_codes()
+    show_transliteration = show_transliteration and transliteration_languages is not None and iso_one in transliteration_languages
+
+    # Setup stanza/NLTK for the target language
+    nlp = None
+    language_data = None
+    if pos_support:
+        stanza.download(iso_one)
+        nlp = stanza.Pipeline(lang=iso_one, processors='tokenize,pos,lemma')
+    else:
+        if show_lemma:
+            language_data = simplemma.load_data(iso_one)
 
     # the final dictionaries we are going to output. Will contain a word as a key along with a count
     word_list = {}
@@ -274,8 +289,7 @@ def run(argv):
         transliteration_languages = get_available_language_codes()
     show_transliteration = show_transliteration and transliteration_languages is not None and iso_one in transliteration_languages
 
-
-# iterate over one or more years
+    # iterate over one or more years
     for year in years:
         # iterate over one or more months
         for month in months:
@@ -328,7 +342,11 @@ def run(argv):
                         paragraph = talk_para.text
                         if verbose:
                             print(paragraph)
-                        word_list, word_features = process_paragraph(nlp, paragraph, word_list, word_features, iso_one, show_transliteration)
+
+                        if pos_support:
+                            word_list, word_features = process_paragraph_stanza(nlp, paragraph, word_list, word_features, iso_one, show_transliteration)
+                        else:
+                            word_list, word_features = process_paragraph_nltk(language_data, paragraph, word_list, word_features, iso_one, show_lemma, show_transliteration)
 
     if word_list is not None:
         print_output(output, iso_one, word_list, word_features,
@@ -338,7 +356,31 @@ def run(argv):
                      )
 
 
-def process_paragraph(nlp, paragraph, word_list, word_features, iso_one, show_transliteration):
+def get_transliteration(word, iso_one, show_transliteration):
+    return translit(word, iso_one, reversed=True) if show_transliteration else ""
+
+
+def process_paragraph_nltk(language_data, paragraph, word_list, word_features, iso_one, show_lemma, show_transliteration):
+    sentences = sent_tokenize(paragraph)
+    for sentence in sentences:
+        if sentence:
+            words = word_tokenize(sentence)
+            for word in words:
+                if len(word) == 1 and re.search(r"\W*", word):
+                    continue
+
+                lcase = word.lower()
+
+                if lcase not in word_list:
+                    word_list, word_features = create_lists(lcase, word_list, word_features, word, sentence,
+                                                            "", "", "", "", simplemma.lemmatize(word, language_data) if show_lemma and language_data  else "",
+                                                            get_transliteration(word, iso_one, show_transliteration))
+                else:
+                    word_list, word_features = update_lists(lcase, word_list, word_features, word, sentence)
+    return word_list, word_features
+
+
+def process_paragraph_stanza(nlp, paragraph, word_list, word_features, iso_one, show_transliteration):
     exclude_pos = ["PUNCT", "NUM", "AUX", "PROPN"]
     doc = nlp(paragraph)
     for i, sentence in enumerate(doc.sentences):
@@ -346,28 +388,40 @@ def process_paragraph(nlp, paragraph, word_list, word_features, iso_one, show_tr
             if word.pos not in exclude_pos:
                 lcase = word.text.lower()
                 if lcase not in word_list:
-                    word_list[lcase] = 1
-
-                    word_features[lcase] = {
-                        'raw': [word.text],
-                        'sentences': [sentence.text],
-                        'pos': word.pos,
-                        'upos': word.upos,
-                        'xpos': word.xpos,
-                        'feats': word.feats,
-                        'lemma': word.lemma,
-                        'transliteration': translit(word.text, iso_one, reversed=True) if show_transliteration else ""
-                    }
+                    word_list, word_features = create_lists(lcase, word_list, word_features, word.text, sentence.text,
+                                                            word.pos, word.upos, word.xpos, word.feats, word.lemma,
+                                                            get_transliteration(word.text, iso_one, show_transliteration))
                 else:
-                    word_list[lcase] += 1
-                    if word not in word_features[lcase]['raw']:
-                        word_features[lcase]['raw'].append(word)
-                    if sentence not in word_features[lcase]['sentences']:
-                        word_features[lcase]['sentences'].append(sentence.text)
+                    word_list, word_features = update_lists(lcase, word_list, word_features, word, sentence.text)
     return word_list, word_features
 
 
-def print_output(output, iso_one,word_list, word_features,
+def create_lists(lcase, word_list, word_features, word, sentence, pos, upos, xpos, feats, lemma, transliteration):
+    word_list[lcase] = 1
+
+    word_features[lcase] = {
+        'raw': [word],
+        'sentences': [sentence],
+        'pos': pos,
+        'upos': upos,
+        'xpos': xpos,
+        'feats': feats,
+        'lemma': lemma,
+        'transliteration': transliteration
+    }
+    return word_list, word_features
+
+
+def update_lists(lcase, word_list, word_features, word, sentence):
+    word_list[lcase] += 1
+    if word not in word_features[lcase]['raw']:
+        word_features[lcase]['raw'].append(word)
+    if sentence not in word_features[lcase]['sentences']:
+        word_features[lcase]['sentences'].append(sentence)
+    return word_list, word_features
+
+
+def print_output(output, iso_one, word_list, word_features,
                  hide_count, show_transliteration, show_lemma,
                  show_translation, show_pos, show_sentence,
                  max_translation, min_translation):
@@ -411,7 +465,7 @@ def print_output(output, iso_one,word_list, word_features,
             output_line = "%s\t%s" % (output_line, features['lemma'] if features['lemma'] is not None else "")
 
         if show_translation and max_translation >= word_list[word] >= min_translation > 0:
-            translation = translator.translate(word, src=iso_one, dest="en").text
+            translation = translator.translate(word, dest="en").text
             output_line = "%s\t%s" % (output_line, translation if translation is not None else "")
 
         if show_pos:
