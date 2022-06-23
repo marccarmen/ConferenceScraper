@@ -1,4 +1,5 @@
 import sys
+import os
 import getopt
 from datetime import date
 import re
@@ -24,7 +25,7 @@ import simplemma
 def usage():
     print("ConferenceScraper [-l <LANGUAGE>] [-y <YEAR>] [-m <MONTH>] [-o <OUTPUT>] "
           "[--includeLemma] [--includeTransliteration] [--translateMin <NUM>] [--translateMax <NUMBER>] "
-          "[--hideCount] [-v] [-h] [--showPOS] [--showSentence]")
+          "[--hideCount] [-v] [-h] [--showPOS] [--showSentence] [--cache]")
     print("SUPPORTED LANGUAGES: bul, deu, eng, spa, fra, kor, ita, por, rus")
     print("SUPPORTED YEAR FORMATS: yyyy or yyyy-yyyy or yyyy,yyyy,yyyy")
     print("SUPPORTED MONTHS: 04 or 10 or 04,10")
@@ -161,12 +162,14 @@ def run(argv):
     verbose = False
     show_pos = False
     show_sentence = False
+    cache_directory = None
 
     # process the input from the command line
     try:
         opts, args = getopt.getopt(argv, "l:y:m:o:hv", ["language=", "year=", "month=", "output=", "verbose",
                                                         "includeLemma", "includeTransliteration", "translateMin=",
-                                                        "translateMax=", "hideCount", "showPOS", "showSentence"])
+                                                        "translateMax=", "hideCount", "showPOS", "showSentence",
+                                                        "cache="])
     except getopt.GetoptError as err:
         print(err)
         usage()
@@ -202,6 +205,11 @@ def run(argv):
             show_pos = True
         elif opt == "--showSentence":
             show_sentence = True
+        elif opt == "--cache":
+            if os.path.exists(arg) and not os.path.isdir(arg):
+                cache_directory = arg
+            else:
+                assert False, "Cache directory doesn't exist"
         else:
             assert False, "unhandled option"
 
@@ -310,6 +318,7 @@ def run(argv):
             # these variables are only used for providing progress update
             talk_count = 0
 
+            full_text_xml = ""
             # iterate over each talk URL
             for talk_link in tqdm(talks, unit=" talks"):
                 talk_count += 1
@@ -482,3 +491,11 @@ def print_output(output, iso_one, word_list, word_features,
             else:
                 if output_line is not None:
                     print(output_line)
+
+
+def get_filename(lang, year, month):
+    return "%s_%s_%s.txt" % (lang, year, month)
+
+
+def check_cache_exists(cache, filename):
+    return os.path.exists(os.path.join(cache, filename))
