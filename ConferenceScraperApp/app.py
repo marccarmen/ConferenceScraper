@@ -19,6 +19,8 @@ import stanza
 # Linguistic processing for other languages
 from nltk import sent_tokenize, word_tokenize
 import simplemma
+# read and write json
+import json
 
 
 # provide the usage
@@ -206,8 +208,9 @@ def run(argv):
         elif opt == "--showSentence":
             show_sentence = True
         elif opt == "--cache":
-            if os.path.exists(arg) and not os.path.isdir(arg):
-                cache_directory = arg
+            path = arg
+            if os.path.exists(path) and os.path.isdir(path):
+                cache_directory = path
             else:
                 assert False, "Cache directory doesn't exist"
         else:
@@ -302,63 +305,23 @@ def run(argv):
         # iterate over one or more months
         for month in months:
             print("Processing %s %s" % (month, year))
-            base_url = "%s/study/general-conference/%s/%s?lang=%s" % (site_url, year, month, lang_url)
-            if verbose:
-                print("Begin scraping %s/%s in %s ( %s )" % (month, year, lang_url, base_url))
 
-            # load the URL based on the input
-            base_page = requests.get(base_url)
+            cache_filename = None
+            if cache_directory is not None:
+                cache_filename = get_cache_filename(lang, year, month)
 
-            # load the page HTML into beautiful soup
-            base_soup = BeautifulSoup(base_page.content, "html.parser")
-
-            # get a list of all the talks
-            talks = base_soup.findAll("a", {"class": lambda l: l and l.startswith('listTile')})
-
-            # these variables are only used for providing progress update
-            talk_count = 0
-
-            full_text_xml = ""
-            # iterate over each talk URL
-            for talk_link in tqdm(talks, unit=" talks"):
-                talk_count += 1
-                # print("Processing talk %d of %d" % (talk_count, talk_total))
-                talk_url = talk_link["href"]
-                # the name of the URL always ends with digits and then the last name of the speaker
-
-                talk_url = "%s?lang=%s" % (talk_url, lang_url)
-                if verbose:
-                    print("PROCESSING: %s " % talk_url)
-                # load the talk page and convert to a BeautifulSoup object
-                talk_page = requests.get("%s%s" % (site_url, talk_url))
-                talk_soup = BeautifulSoup(talk_page.content, "html.parser")
-                # Get the talk metadata
-                title = talk_soup.find("title").text
-                speaker = \
-                    talk_soup.find("p", class_="author-name").text if talk_soup.find("p", class_="author-name") else ""
-                role = \
-                    talk_soup.find("p", class_="author-role").text if talk_soup.find("p", class_="author-role") else ""
-                summary = talk_soup.find("p", class_="kicker").text if talk_soup.find("p", class_="kicker") \
-                    else ""
-                if verbose:
-                    print("%s\n%s\n%s\n%s" % (title, speaker, role, summary))
-
-                talk_paragraphs = talk_soup.findAll("p", id=re.compile(".*"))
-                # iterate over all the paragraphs looking for p# or title# which are the text of the talk
-                for talk_para in talk_paragraphs:
-                    if "id" in talk_para.attrs and \
-                            (re.search(r"^p\d+$", talk_para["id"]) or re.search(r"^title\d+$", talk_para["id"])):
-                        paragraph = talk_para.text
-                        if verbose:
-                            print(paragraph)
-
-                        if pos_support:
-                            word_list, word_features = process_paragraph_stanza(nlp, paragraph, word_list, word_features, iso_one, show_transliteration)
-                        else:
-                            word_list, word_features = process_paragraph_nltk(language_data, paragraph, word_list, word_features, iso_one, show_lemma, show_transliteration)
+            if cache_filename is not None and check_cache_exists(cache_directory, cache_filename):
+                word_list, word_features = process_session_cache(verbose, pos_support, nlp, language_data,
+                                                                 iso_one, show_lemma, show_transliteration,
+                                                                 cache_directory, cache_filename,
+                                                                 word_list, word_features)
+            else:
+                word_list, word_features = process_session_web(verbose, site_url, pos_support, nlp, language_data,
+                                                           iso_one, show_lemma, show_transliteration, year, month,
+                                                           lang_url, word_list, word_features, cache_directory)
 
     if word_list is not None:
-        print_output(output, iso_one, word_list, word_features,
+        print_output(output, word_list, word_features,
                      hide_count, show_transliteration, show_lemma,
                      show_translation, show_pos, show_sentence,
                      max_translation, min_translation
@@ -382,7 +345,7 @@ def process_paragraph_nltk(language_data, paragraph, word_list, word_features, i
 
                 if lcase not in word_list:
                     word_list, word_features = create_lists(lcase, word_list, word_features, word, sentence,
-                                                            "", "", "", "", simplemma.lemmatize(word, language_data) if show_lemma and language_data  else "",
+                                                            "", "", "", "", simplemma.lemmatize(word, language_data) if show_lemma and language_data else "",
                                                             get_transliteration(word, iso_one, show_transliteration))
                 else:
                     word_list, word_features = update_lists(lcase, word_list, word_features, word, sentence)
@@ -430,7 +393,7 @@ def update_lists(lcase, word_list, word_features, word, sentence):
     return word_list, word_features
 
 
-def print_output(output, iso_one, word_list, word_features,
+def print_output(output, word_list, word_features,
                  hide_count, show_transliteration, show_lemma,
                  show_translation, show_pos, show_sentence,
                  max_translation, min_translation):
@@ -493,9 +456,133 @@ def print_output(output, iso_one, word_list, word_features,
                     print(output_line)
 
 
-def get_filename(lang, year, month):
-    return "%s_%s_%s.txt" % (lang, year, month)
+def get_cache_filename(lang, year, month):
+    return "%s_%s_%s.json" % (lang, year, month)
 
 
 def check_cache_exists(cache, filename):
     return os.path.exists(os.path.join(cache, filename))
+
+
+def process_session_cache(verbose, pos_support, nlp, language_data,
+                          iso_one, show_lemma, show_transliteration,
+                          cache_directory, cache_filename,
+                          word_list, word_features):
+    cache_file_path = os.path.join(cache_directory, cache_filename)
+    if verbose:
+        print("Process file %s" % cache_file_path)
+
+    f = open(cache_file_path, "r")
+    session_json = json.load(f)
+    f.close()
+
+    for talk in tqdm(session_json["talks"], unit=" talks"):
+        if verbose:
+            print("PROCESSING: %s " % talk["url"])
+
+        if verbose:
+            print("%s\n%s\n%s\n%s" % (talk["title"], talk["speaker"], talk["role"], talk["summary"]))
+
+        # iterate over all the paragraphs looking for p# or title# which are the text of the talk
+        for talk_para in talk["paragraphs"]:
+            paragraph = talk_para["paragraph"]
+            if verbose:
+                print(paragraph)
+
+            if pos_support:
+                word_list, word_features = process_paragraph_stanza(nlp, paragraph, word_list, word_features, iso_one, show_transliteration)
+            else:
+                word_list, word_features = process_paragraph_nltk(language_data, paragraph, word_list, word_features, iso_one, show_lemma, show_transliteration)
+
+    return word_list, word_features
+
+
+def process_session_web(verbose, site_url, pos_support, nlp, language_data,
+                        iso_one, show_lemma, show_transliteration, year, month,
+                        lang_url, word_list, word_features, cache_directory):
+    base_url = "%s/study/general-conference/%s/%s?lang=%s" % (site_url, year, month, lang_url)
+    if verbose:
+        print("Begin scraping %s/%s in %s ( %s )" % (month, year, lang_url, base_url))
+
+    # load the URL based on the input
+    base_page = requests.get(base_url)
+
+    # load the page HTML into beautiful soup
+    base_soup = BeautifulSoup(base_page.content, "html.parser")
+
+    # get a list of all the talks
+    talks = base_soup.findAll("a", {"class": lambda l: l and l.startswith('listTile')})
+
+    session_json = None
+    if cache_directory is not None:
+        session_json = {
+            "language": lang_url,
+            "year": year,
+            "month": month,
+            "base_url": base_url,
+            "talks": []
+        }
+    # iterate over each talk URL
+    for talk_link in tqdm(talks, unit=" talks"):
+        talk_url = "%s?lang=%s" % (talk_link["href"], lang_url)
+        if verbose:
+            print("PROCESSING: %s " % talk_url)
+        # load the talk page and convert to a BeautifulSoup object
+        talk_page = requests.get("%s%s" % (site_url, talk_url))
+        talk_soup = BeautifulSoup(talk_page.content, "html.parser")
+        # Get the talk metadata
+        title = talk_soup.find("title").text
+        speaker = \
+            talk_soup.find("p", class_="author-name").text if talk_soup.find("p", class_="author-name") else ""
+        speaker = speaker.replace("\xa0", " ")
+        role = \
+            talk_soup.find("p", class_="author-role").text if talk_soup.find("p", class_="author-role") else ""
+        summary = talk_soup.find("p", class_="kicker").text if talk_soup.find("p", class_="kicker") \
+            else ""
+
+        if speaker is None or speaker == "":
+            continue
+
+        if verbose:
+            print("%s\n%s\n%s\n%s" % (title, speaker, role, summary))
+
+        talk_paragraphs = talk_soup.findAll("p", id=re.compile(".*"))
+
+        talk_json = None
+        if session_json is not None:
+            talk_json = {
+                "url": talk_url,
+                "title": title,
+                "speaker": speaker,
+                "role": role,
+                "summary": summary,
+                "paragraphs": []
+            }
+        # iterate over all the paragraphs looking for p# or title# which are the text of the talk
+        for talk_para in talk_paragraphs:
+            if "id" in talk_para.attrs and \
+                    (re.search(r"^p\d+$", talk_para["id"]) or re.search(r"^title\d+$", talk_para["id"])):
+                paragraph = talk_para.text
+                if talk_json is not None:
+                    talk_json["paragraphs"].append({
+                        "id": talk_para.attrs["id"],
+                        "paragraph": paragraph
+                    })
+                if verbose:
+                    print(paragraph)
+
+                if pos_support:
+                    word_list, word_features = process_paragraph_stanza(nlp, paragraph, word_list, word_features, iso_one, show_transliteration)
+                else:
+                    word_list, word_features = process_paragraph_nltk(language_data, paragraph, word_list, word_features, iso_one, show_lemma, show_transliteration)
+        if session_json is not None and talk_json is not None:
+            session_json["talks"].append(talk_json)
+    if cache_directory is not None and \
+            session_json is not None and \
+            len(session_json["talks"]) > 0:
+        cache_filename = get_cache_filename(lang_url, year, month)
+        cache_full_path = os.path.join(cache_directory, cache_filename)
+        f = open(cache_full_path, "w")
+        json.dump(session_json, f)
+        f.close()
+    return word_list, word_features
