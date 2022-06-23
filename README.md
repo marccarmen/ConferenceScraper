@@ -75,7 +75,10 @@ translated.</li>
 <li><code>--hideCount</code> will hide the count column in the output</li>
 <li><code>--showPOS</code> includes the part of speech for each word</li>
 <li><code>--showSentence</code> include a randomly chosen sample sentence for each word</li>
-
+<li><code>--cache=DIRECTORY_PATH</code> If this parameter is included then each session will be saved
+in json format to a file in <code>DIRECTORY_PATH</code>. If a session is found in 
+<code>DIRECTORY_PATH</code> then the script will use the cached version rather than 
+pulling the data from the web. This slightly increases the speed of the scripts.</li>
 
 # Output
 The output of this script is a tab separated list that looks like the table
